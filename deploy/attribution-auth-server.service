@@ -1,0 +1,17 @@
+[Unit]
+Description=Business Attribution OAuth2 Server
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=attribution
+Group=attribution
+WorkingDirectory=/opt/business-attribution
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/business-attribution/.venv/bin/uvicorn auth_server.main:app --host 127.0.0.1 --port 8001 --workers 1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

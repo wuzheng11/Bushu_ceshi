@@ -1,0 +1,129 @@
+name: business-attribution
+
+services:
+  mysql:
+    image: mysql:8.0.26
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${APP_DB_NAME:-business_attribution_app}
+      MYSQL_USER: attribution
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/docker/mysql-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  backend:
+    image: business-attribution-app:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ROLE: backend
+      SEED_ON_START: "true"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: attribution
+      AUTH_SERVER_URL: http://auth-server:8001
+      AUTH_PUBLIC_URL: https://${DOMAIN}
+      AUTH_REDIRECT_URI: https://${DOMAIN}/auth/callback
+      BACKEND_BASE_URL: https://${DOMAIN}
+      FRONTEND_URL: https://${DOMAIN}
+      COOKIE_SECURE: "true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+      - uploads_data:/app/uploads
+      - exports_data:/app/exports
+      - workspace_data:/app/workspace
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  auth-server:
+    image: business-attribution-app:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_ROLE: auth
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: attribution
+      AUTH_REDIRECT_URI: https://${DOMAIN}/auth/callback
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    image: business-attribution-app:local
+    restart: unless-stopped
+    environment:
+      APP_ROLE: web
+    depends_on:
+      backend:
+        condition: service_healthy
+      auth-server:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?请在 .env 中设置 DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  app_data:
+  uploads_data:
+  exports_data:
+  workspace_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,13 @@
+product_id,product_name,category_id,price,status
+101,快充数据线,1,39.9,active
+102,无线充电器,1,89.0,active
+201,可折叠收纳箱,2,69.0,active
+202,桌面收纳架,2,49.9,active
+301,轻量跑步腰包,3,79.0,active
+302,户外保温杯,3,119.0,active
+401,修护精华,4,159.0,active
+402,防晒喷雾,4,99.0,active
+501,猫粮尝鲜装,5,59.9,active
+502,宠物梳毛器,5,45.0,active
+601,桌面文件架,6,35.0,active
+602,中性签字笔套装,6,29.9,active
